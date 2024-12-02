@@ -1,3 +1,5 @@
+<!-- okayy na too haaa -->
+
 <template>
   <div class="manage-qr-codes">
     <h1>Manage QR Codes</h1>
