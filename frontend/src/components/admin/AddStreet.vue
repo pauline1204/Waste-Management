@@ -3,10 +3,16 @@
     <h1>Add New Street</h1>
     <form @submit.prevent="addStreet">
       <label for="street-name">Street Name:</label>
-      <input v-model="streetName" id="street-name" type="text" required placeholder="Enter street name" />
-      <button type="submit">Add Street</button>
+      <input 
+        v-model="streetName" 
+        id="street-name" 
+        type="text" 
+        required 
+        placeholder="Enter street name" 
+      />
+      <button type="submit">Save Street</button>
     </form>
-    
+
     <!-- Display added streets -->
     <div v-if="streets.length">
       <h2>Streets List</h2>
@@ -14,10 +20,15 @@
         <li v-for="(street, index) in streets" :key="index">{{ street }}</li>
       </ul>
     </div>
+    <div v-else>
+      <p>No streets added yet.</p>
+    </div>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: "AddStreet",
   data() {
@@ -27,31 +38,53 @@ export default {
     };
   },
   created() {
-    // Load the streets from localStorage when the component is created
-    const savedStreets = localStorage.getItem("streets");
-    if (savedStreets) {
-      this.streets = JSON.parse(savedStreets);
-    }
+    this.fetchStreets(); // Load the streets from the backend when the component is created
   },
   methods: {
-    addStreet() {
-      if (this.streetName.trim()) {
-        // Check if the street is already in the list
-        if (!this.streets.includes(this.streetName.trim())) {
-          this.streets.push(this.streetName.trim()); // Add new street to the list
-          alert(`Street "${this.streetName}" added successfully!`);
-          this.streetName = ""; // Clear the input field after adding
-          this.saveStreets();    // Save the updated list to localStorage
-        } else {
-          alert("This street is already added.");
+    // Method to add a new street
+    async addStreet() {
+      const trimmedName = this.streetName.trim();
+      if (!trimmedName) {
+        alert("Please enter a valid street name."); // Prevent empty submissions
+        return;
+      }
+
+      try {
+        console.log('Adding street:', trimmedName); // Debugging log
+        const response = await axios.post('http://localhost:3000/streets', {
+          name: trimmedName,
+        });
+
+        if (response.status === 201) {
+          alert(`Street "${trimmedName}" added successfully!`);
+          this.streetName = ""; // Clear the input field
+          this.fetchStreets();  // Refresh the list of streets from the backend
         }
-      } else {
-        alert("Please enter a valid street name.");
+      } catch (error) {
+        console.error('Error adding street:', error.response?.data || error.message); // Debug error details
+        alert("Error adding street: " + (error.response?.data || error.message));
       }
     },
-    saveStreets() {
-      // Save the streets list to localStorage
-      localStorage.setItem("streets", JSON.stringify(this.streets));
+
+    // Method to fetch the list of streets from the backend
+    async fetchStreets() {
+      try {
+        console.log('Fetching streets from server...');
+        const response = await axios.get('http://localhost:3000/streets');
+        
+        // Check if response data is valid
+        if (Array.isArray(response.data)) {
+          this.streets = response.data;
+        } else {
+          console.error('Unexpected response data:', response.data);
+          alert("Error: Unexpected data format.");
+        }
+
+        console.log('Fetched streets:', this.streets);
+      } catch (error) {
+        console.error('Error fetching streets:', error.response?.data || error.message);
+        alert("Error fetching streets: " + (error.response?.data || error.message));
+      }
     },
   },
 };
@@ -122,5 +155,11 @@ li {
   background-color: var(--color-background-light);
   border-radius: 4px;
   margin-bottom: 0.5rem;
+}
+
+p {
+  margin-top: 1rem;
+  color: var(--color-text-light);
+  font-style: italic;
 }
 </style>

@@ -1,71 +1,112 @@
 <template>
   <div class="generate-qr">
     <h1>Generate QR Code</h1>
+
+    <!-- Form to select a street and generate QR code -->
     <form @submit.prevent="generateQRCode">
-      <label for="inputData">Enter Household ID:</label>
-      <input
-        type="text"
-        id="inputData"
-        v-model="inputData"
-        placeholder="Enter household ID for QR code"
-        required
-      />
-      <button type="submit">Generate QR Code</button>
+      <label for="street">Select Street:</label>
+      <select v-model="selectedStreet" id="street" required>
+        <option value="" disabled>Select a street</option>
+        <option v-for="(street, index) in streets" :key="index" :value="street">
+          {{ street }}
+        </option>
+      </select>
+      <button type="submit" :disabled="!selectedStreet">Generate QR Code</button>
     </form>
 
-    <!-- Display QR Code -->
+    <!-- Display the generated QR Code -->
     <div v-if="qrCodeData" class="qr-code-container">
       <h2>Generated QR Code:</h2>
       <img :src="qrCodeData" alt="QR Code" />
       <button @click="downloadQRCode">Download QR Code</button>
     </div>
+
+    <!-- Display the list of streets -->
+    <div v-if="streets.length">
+      <h2>Streets List</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Street Name</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(street, index) in streets" :key="index">
+            <td>{{ street }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
-
 <script>
 import QRCode from "qrcode";
+import axios from "axios";
 
 export default {
   name: "GenerateQR",
   data() {
     return {
-      inputData: "", // Household ID to encode
-      qrCodeData: null, // Base64-encoded QR code image
+      selectedStreet: "", // Street selected by the admin
+      streets: [],        // List of streets from the backend
+      qrCodeData: null,   // Base64-encoded QR code image
     };
   },
+  created() {
+    this.fetchStreets(); // Load the streets from the backend when the component is created
+  },
   methods: {
+    // Generate the QR code and save it to the database
     async generateQRCode() {
       try {
-        if (this.inputData) {
-          const householdUrl = `http://localhost:5173/login?role=collector&householdId=${this.inputData}`;
-          
-          // Generate QR Code as a Base64 image
-          this.qrCodeData = await QRCode.toDataURL(householdUrl, {
+        if (this.selectedStreet) {
+          // Generate the QR Code data URL
+          const streetUrl = `http://localhost:5173/street?name=${this.selectedStreet}`;
+          this.qrCodeData = await QRCode.toDataURL(streetUrl, {
             width: 200,
             margin: 2,
           });
 
-          // Store the QR code in localStorage
-          const qrCodes = JSON.parse(localStorage.getItem("qrCodes")) || [];
-          qrCodes.push({ id: Date.now(), householdId: this.inputData, qrUrl: this.qrCodeData });
-          localStorage.setItem("qrCodes", JSON.stringify(qrCodes));
+          // Save the street name and QR code to the database via backend
+          await axios.post("http://localhost:3000/qr-codes", {
+            street: this.selectedStreet,
+            qrCode: this.qrCodeData,
+          });
+
+          alert("QR Code generated and saved successfully!");
         }
       } catch (error) {
         console.error("Error generating QR Code:", error);
+        alert("Failed to generate QR Code.");
       }
     },
+
+    // Fetch streets from the database
+    async fetchStreets() {
+      try {
+        const response = await axios.get("http://localhost:3000/streets");
+        if (Array.isArray(response.data)) {
+          this.streets = response.data; // Set the fetched streets to the component's data
+        } else {
+          console.error("Invalid response format", response);
+          alert("Failed to fetch streets.");
+        }
+      } catch (error) {
+        console.error("Error fetching streets:", error);
+        alert("Failed to fetch streets.");
+      }
+    },
+
+    // Download the generated QR Code as an image file
     downloadQRCode() {
       const link = document.createElement("a");
       link.href = this.qrCodeData;
-      link.download = "qr-code.png";
+      link.download = `${this.selectedStreet}-qr-code.png`; // Ensure proper file extension
       link.click();
     },
   },
 };
 </script>
-
-
-
 <style scoped>
 .generate-qr {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -83,7 +124,7 @@ form {
   gap: 10px;
 }
 
-input[type="text"] {
+select {
   padding: 10px;
   font-size: 16px;
   border: 1px solid #ddd;
@@ -115,5 +156,21 @@ button:hover {
   margin: 10px 0;
   width: 200px;
   height: 200px;
+}
+
+table {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f1f1f1;
 }
 </style>
